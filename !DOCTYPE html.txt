@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Justice & Truth Center</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Pretendard:wght@300;600&display=swap');
+
+        :root {
+            --neon-blue: #00D2FF;
+            --neon-red: #FF0055;
+            --deep-dark: #0A0E17;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--deep-dark);
+            color: white;
+            font-family: 'Pretendard', sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 배경 애니메이션 효과 */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, #1a2a44 0%, transparent 80%);
+            z-index: -1;
+        }
+
+        header {
+            margin-top: 60px;
+            text-align: center;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            letter-spacing: 5px;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, var(--neon-blue), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 210, 255, 0.5);
+        }
+
+        .subtitle {
+            font-weight: 300;
+            color: #8A99AF;
+            letter-spacing: 2px;
+        }
+
+        /* 메인 컨텐츠 영역 */
+        .hub-container {
+            display: flex;
+            gap: 40px;
+            margin-top: 80px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* 카드 스타일 */
+        .service-card {
+            width: 320px;
+            height: 450px;
+            background: var(--glass);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            backdrop-filter: blur(15px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            transition: 0.5s;
+        }
+
+        .service-card:hover::before {
+            left: 100%;
+        }
+
+        .service-card:hover {
+            transform: translateY(-15px);
+            border-color: var(--card-color);
+            box-shadow: 0 15px 40px -10px var(--card-shadow);
+        }
+
+        /* 아이콘 영역 */
+        .icon-box {
+            font-size: 50px;
+            margin-bottom: 20px;
+        }
+
+        h2 { font-size: 24px; margin-bottom: 15px; }
+        p { color: #A0AEC0; font-size: 15px; line-height: 1.6; }
+
+        /* 이동 버튼 */
+        .nav-button {
+            display: inline-block;
+            padding: 15px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+            background: var(--card-color);
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-button:hover {
+            filter: brightness(1.2);
+            box-shadow: 0 0 15px var(--card-color);
+        }
+
+        /* 개별 카드 테마 컬러 */
+        .fake-news { --card-color: #00D2FF; --card-shadow: rgba(0, 210, 255, 0.3); }
+        .cyber-crime { --card-color: #FF0055; --card-shadow: rgba(255, 0, 85, 0.3); }
+
+        footer {
+            margin-top: auto;
+            padding-bottom: 40px;
+            color: #4A5568;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>영기와 친구들</h1>
+        <p class="subtitle">DIGITAL INTEGRITY & LEGAL ANALYSIS SYSTEM</p>
+    </header>
+
+    <main class="hub-container">
+       
+        <!-- 가짜뉴스 사이트 링크 카드 -->
+        <section class="service-card fake-news">
+            <div>
+                <div class="icon-box">🛡️</div>
+                <h2>가짜뉴스 판별기</h2>
+                <p>정보의 홍수 속에서 사실 관계를 추적하고 기사의 신뢰성을 기술적으로 분석하여 정보의 왜곡을 방지합니다.</p>
+            </div>
+            <a href="file:///C:/Users/Administrator/Desktop/%EA%B0%80%EC%A7%9C%EB%89%B4%EC%8A%A4.html" class="nav-button">시스템 가동</a>
+        </section>
+
+        <!-- 악플 자가진단 사이트 링크 카드 -->
+        <section class="service-card cyber-crime">
+            <div>
+                <div class="icon-box">⚖️</div>
+                <h2>악플 법적 리스크 진단</h2>
+                <p>작성된 텍스트의 모욕성, 특정성, 공연성을 결합 분석하여 형법 및 관련 법령 위반 여부를 사전 검증합니다.</p>
+            </div>
+            <a href="file:///C:/Users/Administrator/Desktop/%EC%95%85%ED%94%8C.html" class="nav-button">정밀 검사 실행</a>
+        </section>
+
+    </main>
+
+    <footer>
+        &copy; 2026 DIGITAL INTEGRITY OVERSIGHT BOARD. ALL RIGHTS RESERVED.
+    </footer>
+
+</body>
+</html>
