@@ -3,468 +3,2580 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TruthGuard - 악플 위험도 검출기</title>
+  <title>TruthGuard - AI 악플 탐지 및 유해 댓글 예방 플랫폼</title>
   
-  <!-- Google Fonts: Outfit (영어/숫자) & Noto Sans KR (한국어) -->
+  <!-- Google Fonts: Outfit (UI English/Numbers) & Noto Sans KR (Korean UI) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
     /* -------------------------------------------------------------
-       1. DESIGN SYSTEM & CSS VARIABLES
+       1. GLOBAL DESIGN SYSTEM & THEME VARIABLES
        ------------------------------------------------------------- */
     :root {
-      /* 기본 다크 테마 색상 정의 */
-      --bg-dark: #090d16;
-      --bg-card: rgba(17, 24, 39, 0.85);
+      /* Core Dark Theme Palette */
+      --bg-deep: #050811;
+      --bg-sidebar: #0a0e1c;
+      --bg-card: rgba(15, 23, 42, 0.7);
       --border-color: rgba(255, 255, 255, 0.08);
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
       
-      /* 게이지 상태에 따른 색상 정의 */
-      --color-safe: #10b981;      /* 초록색 (안전) */
-      --color-caution: #f59e0b;   /* 노란색 (주의) */
-      --color-danger: #ef4444;    /* 빨간색 (위험) */
+      /* Brand Accent Colors */
+      --color-brand: #6366f1; /* Indigo */
+      --color-brand-glow: rgba(99, 102, 241, 0.35);
+      --color-emerald: #10b981;
       
-      /* 상태별 글로우 효과 색상 정의 */
-      --glow-safe: rgba(16, 185, 129, 0.4);
-      --glow-caution: rgba(245, 158, 11, 0.4);
-      --glow-danger: rgba(239, 68, 68, 0.5);
+      /* TruthGuard 4 Risk Tiers */
+      --color-safe: #10b981;    /* 안전 (0-30%) */
+      --color-caution: #eab308; /* 주의 (31-60%) */
+      --color-warning: #f97316; /* 경고 (61-80%) */
+      --color-danger: #ef4444;  /* 위험 (81-100%) */
+      
+      --glow-safe: rgba(16, 185, 129, 0.25);
+      --glow-caution: rgba(234, 179, 8, 0.25);
+      --glow-warning: rgba(249, 115, 22, 0.25);
+      --glow-danger: rgba(239, 68, 68, 0.35);
+      
+      /* Dynamic variables updated by JS */
+      --risk-color: var(--color-safe);
+      --risk-glow: var(--glow-safe);
 
-      /* 동적 업데이트를 위한 변수 설정 (기본값: 안전) */
-      --gauge-color: var(--color-safe);
-      --gauge-glow: var(--glow-safe);
+      /* Typography */
+      --font-ko: 'Noto Sans KR', sans-serif;
+      --font-en: 'Outfit', sans-serif;
     }
 
-    /* 전체 리셋 및 기본 서체 설정 */
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      font-family: var(--font-ko);
+      -webkit-font-smoothing: antialiased;
     }
 
     body {
-      background-color: var(--bg-dark);
-      background-image: radial-gradient(circle at 50% 50%, #111827 0%, #030712 100%);
+      background-color: var(--bg-deep);
+      background-image: radial-gradient(circle at 60% 30%, #0c1226 0%, #03060f 100%);
       color: var(--text-main);
-      font-family: 'Noto Sans KR', sans-serif;
       min-height: 100vh;
       display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 1.5rem;
+      overflow-x: hidden;
+    }
+
+    /* Background Glowing Aura */
+    .bg-aura {
+      position: absolute;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      filter: blur(120px);
+      z-index: -1;
+      opacity: 0.12;
+      pointer-events: none;
+      background: var(--risk-color);
+      top: 20%;
+      right: 15%;
+      transition: background 0.8s ease;
     }
 
     /* -------------------------------------------------------------
-       2. CARD LAYOUT (SaaS STYLE)
+       2. LAYOUT: SIDEBAR & MAIN CONTENT
        ------------------------------------------------------------- */
-    .container {
-      width: 100%;
-      max-width: 500px;
-      background: var(--bg-card);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 2.5rem;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-      transition: transform 0.3s ease;
+    .app-container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
     }
 
-    .container:hover {
-      transform: translateY(-2px);
+    /* Sidebar Navigation */
+    aside.sidebar {
+      width: 260px;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 1.75rem 1.25rem;
+      flex-shrink: 0;
     }
 
-    /* 헤더 영역 */
-    header {
-      text-align: center;
-      margin-bottom: 2rem;
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+      padding: 0 0.5rem;
     }
 
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 900;
+    .brand-logo {
+      background: linear-gradient(135deg, var(--color-brand), #4f46e5);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 4px 10px var(--color-brand-glow);
+    }
+
+    .brand-name {
+      font-family: var(--font-en);
+      font-size: 1.35rem;
+      font-weight: 800;
       letter-spacing: -0.025em;
-      background: linear-gradient(135deg, #ffffff 60%, #c7d2fe);
+      background: linear-gradient(135deg, #ffffff 60%, #a5b4fc);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 0.25rem;
     }
 
-    .subtitle {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    /* 입력 영역 */
-    .input-section {
+    .sidebar-menu {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 2rem;
+      gap: 0.4rem;
+      list-style-type: none;
     }
 
-    textarea {
+    .menu-item button {
       width: 100%;
-      height: 120px;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1rem;
-      color: white;
-      font-size: 0.95rem;
-      line-height: 1.5;
-      resize: none;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    textarea:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
-    }
-
-    /* 분석 버튼 */
-    .btn-analyze {
-      width: 100%;
-      background: linear-gradient(135deg, #6366f1, #4f46e5);
-      color: white;
+      background: none;
       border: none;
-      padding: 0.9rem;
+      color: var(--text-muted);
+      padding: 0.8rem 1rem;
       border-radius: 10px;
-      font-weight: 700;
-      font-size: 1rem;
+      font-size: 0.925rem;
+      font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-      transition: all 0.2s;
-    }
-
-    .btn-analyze:hover {
-      opacity: 0.95;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 15px rgba(99, 102, 241, 0.45);
-    }
-
-    .btn-analyze:active {
-      transform: translateY(0);
-    }
-
-    /* -------------------------------------------------------------
-       3. GAUGE BAR & RESULTS
-       ------------------------------------------------------------- */
-    .result-section {
       display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      background: rgba(0, 0, 0, 0.15);
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      padding: 1.5rem;
+      align-items: center;
+      gap: 0.75rem;
+      transition: all 0.2s ease;
+      text-align: left;
     }
 
-    .result-header {
+    .menu-item button:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .menu-item.active button {
+      color: white;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      box-shadow: inset 0 0 10px rgba(99, 102, 241, 0.1);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 0.5rem;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.15);
+      font-family: var(--font-en);
+      letter-spacing: 0.05em;
+      text-align: center;
+    }
+
+    /* Main Content Area */
+    main.content-area {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 2.25rem 2.75rem;
+      position: relative;
+    }
+
+    .page-title-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 2rem;
     }
 
-    .result-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: white;
-    }
-
-    /* 위험도 퍼센트 숫자 */
-    .percent-counter {
-      font-family: 'Outfit', sans-serif;
+    .page-title {
       font-size: 1.6rem;
       font-weight: 800;
       color: white;
     }
 
-    /* 게이지 바 트랙 */
+    .tab-page {
+      display: none;
+      animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .tab-page.active {
+      display: block;
+    }
+
+    @keyframes pageFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Glass Panels */
+    .glass-panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    }
+
+    /* -------------------------------------------------------------
+       3. TAB 1: NLP ANALYZER
+       ------------------------------------------------------------- */
+    .analyzer-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 992px) {
+      .analyzer-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Textarea Card */
+    .textarea-box {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s;
+    }
+
+    .textarea-box:focus-within {
+      border-color: var(--color-brand);
+      box-shadow: 0 0 15px var(--color-brand-glow);
+    }
+
+    textarea.editor-input {
+      width: 100%;
+      height: 230px;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 1.25rem;
+      color: var(--text-main);
+      font-size: 1.05rem;
+      line-height: 1.6;
+      resize: none;
+    }
+
+    .textarea-footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.15);
+      border-bottom-left-radius: 14px;
+      border-bottom-right-radius: 14px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .counters span {
+      color: white;
+      font-weight: 600;
+      font-family: var(--font-en);
+    }
+
+    /* Action Buttons Row */
+    .buttons-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    .btn {
+      padding: 0.85rem 1.5rem;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+      outline: none;
+    }
+
+    .btn-brand {
+      background: linear-gradient(135deg, var(--color-brand), #4f46e5);
+      color: white;
+      box-shadow: 0 4px 15px var(--color-brand-glow);
+      flex-grow: 2;
+    }
+
+    .btn-brand:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-green {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      flex-grow: 1;
+    }
+
+    .btn-green:hover {
+      background: rgba(16, 185, 129, 0.25);
+      transform: translateY(-2px);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      width: 48px;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .btn-outline:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+
+    /* Results Dashboard panel */
+    .dashboard-panel {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      transition: border-color 0.5s, box-shadow 0.5s;
+    }
+
+    .dashboard-panel.glow-active {
+      border-color: var(--risk-color);
+      box-shadow: 0 0 25px var(--risk-glow);
+    }
+
+    /* Gauge Bar Component (TruthGuard Specification) */
+    .gauge-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .gauge-metrics {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .gauge-title-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .gauge-percent-val {
+      font-family: var(--font-en);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: white;
+    }
+
     .gauge-track {
       width: 100%;
-      height: 16px;
+      height: 14px;
       background: rgba(255, 255, 255, 0.05);
       border-radius: 10px;
       overflow: hidden;
       position: relative;
     }
 
-    /* 가로 게이지 바 (CSS 트랜지션 애니메이션 적용) */
     .gauge-fill {
       height: 100%;
-      width: 0%; /* 기본값 0% */
-      background: var(--gauge-color);
+      width: 0%; /* Animates from 0 to target */
+      background-color: var(--risk-color);
       border-radius: 10px;
-      box-shadow: 0 0 12px var(--gauge-glow);
-      /* 가로 너비(width) 변경 시 최소 1초 동안 부드럽게 증가하도록 설정 */
-      transition: width 1s ease, background-color 0.5s ease, box-shadow 0.5s ease;
+      box-shadow: 0 0 10px var(--risk-glow);
+      transition: width 1s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.5s ease, box-shadow 0.5s ease;
     }
 
-    /* 결과 요약 메시지 */
-    .result-message {
-      font-size: 0.9rem;
-      font-weight: 700;
-      text-align: center;
-      padding: 0.75rem;
-      border-radius: 8px;
+    /* Warning Status Card badge */
+    .status-alert-box {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid var(--border-color);
-      color: var(--gauge-color);
+      border-left: 4px solid var(--risk-color);
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      transition: border-color 0.5s ease;
+    }
+
+    .status-alert-icon {
+      color: var(--risk-color);
+      display: flex;
+      align-items: center;
       transition: color 0.5s ease;
     }
 
-    /* 탐지된 악플 단어 목록 */
-    .word-list-card {
+    .status-alert-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .status-alert-badge {
+      font-size: 0.7rem;
+      font-weight: 900;
+      color: var(--risk-color);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: color 0.5s ease;
+    }
+
+    .status-alert-text {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: white;
+    }
+
+    /* Category NLP bars (7 types) */
+    .nlp-categories-section {
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .nlp-cat-bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .nlp-cat-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .nlp-cat-track {
+      height: 5px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .nlp-cat-fill {
+      height: 100%;
+      border-radius: 4px;
+      width: 0%;
+      background-color: var(--risk-color);
+      transition: width 1s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.5s ease;
+    }
+
+    /* Rationales */
+    .rationales-card {
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      padding-top: 1rem;
     }
 
-    .word-list-title {
+    .rationales-title {
       font-size: 0.85rem;
+      font-weight: 700;
+      color: white;
+    }
+
+    .rationales-list {
+      list-style-type: none;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .rationales-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.4rem;
+    }
+
+    .rationales-list li::before {
+      content: '•';
+      color: var(--risk-color);
+      font-weight: bold;
+    }
+
+    /* Text preview with mark highlights */
+    .preview-section {
+      grid-column: span 2;
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-top: 0.5rem;
+    }
+
+    @media (max-width: 992px) {
+      .preview-section {
+        grid-column: span 1;
+      }
+    }
+
+    .preview-heading {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .preview-content {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      min-height: 40px;
+    }
+
+    .preview-content mark {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--color-danger);
+      font-weight: 700;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      padding: 0.1rem 0.25rem;
+      border-radius: 4px;
+    }
+
+    /* -------------------------------------------------------------
+       4. TAB 2: HISTORY LOGS
+       ------------------------------------------------------------- */
+    .history-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .history-input-search {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.55rem 0.9rem;
+      color: white;
+      font-size: 0.85rem;
+      width: 250px;
+      outline: none;
+    }
+
+    .history-table-container {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .hist-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    .hist-table th, .hist-table td {
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .hist-table th {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .hist-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .hist-badge {
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 800;
+      font-size: 0.75rem;
+      color: white;
+      display: inline-block;
+    }
+
+    .hist-badge.safe { background: var(--color-safe); }
+    .hist-badge.caution { background: var(--color-caution); }
+    .hist-badge.warning { background: var(--color-warning); }
+    .hist-badge.danger { background: var(--color-danger); }
+
+    .btn-hist-del {
+      background: none;
+      border: none;
+      color: rgba(239, 68, 68, 0.5);
+      cursor: pointer;
+    }
+
+    .btn-hist-del:hover {
+      color: var(--color-danger);
+    }
+
+    /* -------------------------------------------------------------
+       5. TAB 3: ADMIN STATS DASHBOARD
+       ------------------------------------------------------------- */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 992px) {
+      .kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 576px) {
+      .kpi-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .kpi-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .kpi-logo {
+      background: rgba(255, 255, 255, 0.03);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-brand);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .kpi-texts {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .kpi-label-text {
+      font-size: 0.725rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .kpi-number-text {
+      font-family: var(--font-en);
+      font-size: 1.4rem;
+      font-weight: 800;
+      margin-top: 0.15rem;
+    }
+
+    /* CSS Graph Pillars */
+    .dashboard-charts-layout {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 992px) {
+      .dashboard-charts-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-panel-box {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .chart-panel-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 1.5rem;
+    }
+
+    .graph-flex-track {
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-end;
+      height: 180px;
+      padding-top: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 1rem;
+    }
+
+    .graph-pillar-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      width: 15%;
+    }
+
+    .graph-pillar-bar {
+      width: 28px;
+      background: linear-gradient(to top, var(--color-brand), #818cf8);
+      border-radius: 5px 5px 0 0;
+      transition: height 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+      position: relative;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+    }
+
+    .graph-pillar-bar::after {
+      content: attr(data-val);
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.7rem;
+      font-family: var(--font-en);
       font-weight: 700;
       color: var(--text-muted);
     }
 
-    .word-ul {
-      list-style-type: none;
+    .graph-pillar-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Stats breakdown list */
+    .stats-breakdown-list {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .stats-breakdown-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .stats-breakdown-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .stats-breakdown-track {
+      height: 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      overflow: hidden;
+    }
+
+    .stats-breakdown-fill {
+      height: 100%;
+      border-radius: 10px;
+      background-color: var(--color-brand);
+      width: 0%;
+      transition: width 0.8s ease;
+    }
+
+    /* -------------------------------------------------------------
+       6. TAB 4: CHROME EXTENSION SIMULATOR
+       ------------------------------------------------------------- */
+    .ext-grid {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 992px) {
+      .ext-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .ext-promo-card {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      justify-content: center;
+    }
+
+    .chrome-version-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid rgba(234, 179, 8, 0.2);
+      color: #f59e0b;
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      width: fit-content;
+    }
+
+    .ext-promo-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      line-height: 1.35;
+      color: white;
+    }
+
+    .ext-promo-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Platform Toggles in Simulator */
+    .ext-platform-toggles {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 0.3rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      width: fit-content;
+    }
+
+    .ext-platform-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    .ext-platform-btn.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+    }
+
+    /* Mock Phone / Browser Device frame */
+    .mock-device-frame {
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #0b0e1a;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+      position: relative;
+      min-height: 380px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mock-device-header {
+      background: #121829;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--font-en);
+    }
+
+    .device-dots {
+      display: flex;
+      gap: 0.3rem;
+    }
+
+    .device-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .mock-device-content {
+      padding: 1.5rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      gap: 1rem;
+    }
+
+    /* Simulated Platform templates */
+    .platform-mock-screen {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+      flex-grow: 1;
+    }
+
+    .platform-mock-screen.active {
+      display: flex;
+    }
+
+    /* YouTube screen layout */
+    .yt-video-placeholder {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Everytime mock screen layout */
+    .et-post-placeholder {
+      border: 1px solid rgba(249, 93, 83, 0.25);
+      background: rgba(249, 93, 83, 0.03);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .et-tag {
+      color: #f95d53;
+      font-weight: 800;
+      font-size: 0.75rem;
+    }
+
+    /* Instagram mock screen layout */
+    .ig-header-placeholder {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .ig-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    }
+
+    /* Simulated Comment editor text block */
+    .sim-comment-editor-box {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
       gap: 0.5rem;
     }
 
-    .word-li {
-      font-size: 0.8rem;
-      font-weight: 600;
-      background: rgba(255, 255, 255, 0.04);
+    .sim-textarea {
+      background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--border-color);
-      padding: 0.25rem 0.6rem;
+      border-radius: 8px;
+      padding: 0.75rem;
+      color: white;
+      font-size: 0.85rem;
+      height: 60px;
+      outline: none;
+      resize: none;
+      width: 100%;
+    }
+
+    .sim-textarea:focus {
+      border-color: var(--color-brand);
+    }
+
+    .btn-sim-post {
+      align-self: flex-end;
+      background: var(--color-brand);
+      color: white;
+      border: none;
+      padding: 0.4rem 1rem;
       border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .btn-sim-post:hover {
+      opacity: 0.9;
+    }
+
+    /* TruthGuard Manifest V3 Warning Popup overlay (Interactive) */
+    .tg-extension-popup-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      width: 82%;
+      max-width: 310px;
+      background: #141b2f;
+      border: 2px solid var(--risk-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      display: none;
+      flex-direction: column;
+      gap: 0.85rem;
+      z-index: 100;
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, border-color 0.5s ease;
+    }
+
+    .tg-extension-popup-modal.show {
+      display: flex;
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .ext-modal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--risk-color);
+      font-weight: 800;
+      font-size: 0.9rem;
+      transition: color 0.5s ease;
+    }
+
+    .ext-modal-body {
+      font-size: 0.8rem;
+      line-height: 1.55;
       color: var(--text-main);
     }
 
-    .empty-state {
-      font-size: 0.8rem;
+    .ext-modal-footer {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .btn-modal-primary {
+      background: var(--risk-color);
+      color: white;
+      padding: 0.35rem 0.85rem;
+      border-radius: 5px;
+      font-size: 0.725rem;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: background 0.5s ease;
+    }
+
+    .btn-modal-secondary {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
       color: var(--text-muted);
-      font-style: italic;
+      padding: 0.35rem 0.85rem;
+      border-radius: 5px;
+      font-size: 0.725rem;
+      cursor: pointer;
+    }
+
+    .btn-modal-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    /* -------------------------------------------------------------
+       7. TAB 5: DATABASE PANEL
+       ------------------------------------------------------------- */
+    .db-layout-grid {
+      display: grid;
+      grid-template-columns: 0.85fr 1.15fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .db-layout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .db-form-panel {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .db-form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .db-form-row label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .db-inputs-text {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.85rem;
+      border-radius: 7px;
+      color: white;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .db-inputs-text:focus {
+      border-color: var(--color-brand);
+    }
+
+    .db-inputs-select {
+      background: #0a0f1d;
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.5rem;
+      border-radius: 7px;
+      color: white;
+      cursor: pointer;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .btn-add-db-item {
+      background: linear-gradient(135deg, var(--color-emerald), #059669);
+      color: white;
+      font-weight: 700;
+      padding: 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+
+    .btn-add-db-item:hover {
+      opacity: 0.9;
+    }
+
+    .db-table-holder {
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      height: 330px;
+    }
+
+    .db-search-header-row {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .db-search-box-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: white;
+      width: 100%;
+      font-size: 0.8rem;
+    }
+
+    .db-table-body-scroller {
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+
+    .db-table-repr {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      text-align: left;
+    }
+
+    .db-table-repr th, .db-table-repr td {
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .db-table-repr th {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .btn-db-row-del {
+      background: none;
+      border: none;
+      color: rgba(239, 68, 68, 0.5);
+      cursor: pointer;
+    }
+
+    .btn-db-row-del:hover {
+      color: var(--color-danger);
     }
   </style>
 </head>
 <body>
 
-  <!-- 카드 본체 구조 -->
-  <div class="container">
-    <header>
-      <h1>악플 위험도 검출기</h1>
-      <div class="subtitle">텍스트를 분석하여 안전 상태를 모니터링합니다.</div>
-    </header>
+  <!-- Background Glowing Aura -->
+  <div class="bg-aura" id="bgAuraBlob"></div>
 
-    <!-- 입력 텍스트 에어리어 및 분석 시작 버튼 -->
-    <div class="input-section">
-      <textarea id="commentText" placeholder="여기에 분석할 문장 또는 댓글을 입력하세요...&#10;(예: 진짜 바보 멍청이 아니야? 행동이 최악이네 꺼져라)"></textarea>
-      <button class="btn-analyze" id="btnAnalyze">분석 시작</button>
-    </div>
-
-    <!-- 게이지 바 및 상세 결과 표시 영역 -->
-    <div class="result-section">
-      <div class="result-header">
-        <span class="result-title">위험 지수</span>
-        <!-- 위험도 퍼센트 숫자 -->
-        <span class="percent-counter" id="lblPercent">0%</span>
+  <div class="app-container">
+    
+    <!-- SIDEBAR NAVIGATION PANEL -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <i data-lucide="shield-check"></i>
+        </div>
+        <span class="brand-name">TruthGuard</span>
       </div>
 
-      <!-- 가로 게이지 바 컴포넌트 -->
-      <div class="gauge-track">
-        <div class="gauge-fill" id="gaugeFill"></div>
+      <ul class="sidebar-menu">
+        <li class="menu-item active" data-tab="tab-analyzer">
+          <button><i data-lucide="search-code" style="width: 16px;"></i>검사기 (Analyzer)</button>
+        </li>
+        <li class="menu-item" data-tab="tab-history">
+          <button><i data-lucide="history" style="width: 16px;"></i>이력 조회 (History)</button>
+        </li>
+        <li class="menu-item" data-tab="tab-dashboard" id="btnSidebarDashboard">
+          <button><i data-lucide="layout-dashboard" style="width: 16px;"></i>대시보드 (Dashboard)</button>
+        </li>
+        <li class="menu-item" data-tab="tab-extension">
+          <button><i data-lucide="chrome" style="width: 16px;"></i>확장 프로그램</button>
+        </li>
+        <li class="menu-item" data-tab="tab-database">
+          <button><i data-lucide="database" style="width: 16px;"></i>금지 단어 DB</button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        🛡️ TRUTHGUARD PLATFORM<br>DIGITAL INTEGRITY SYSTEM
+      </div>
+    </aside>
+
+    <!-- MAIN DISPLAY SPACE -->
+    <main class="content-area">
+      
+      <!-- -------------------------------------------------------------
+           TAB 1: NLP ANALYZER
+           ------------------------------------------------------------- -->
+      <div class="tab-page active" id="tab-analyzer">
+        <div class="page-title-row">
+          <h2 class="page-title">실시간 유해성 문맥 검사기</h2>
+        </div>
+
+        <div class="analyzer-grid">
+          
+          <!-- Editor Section -->
+          <div class="glass-panel" style="display: flex; flex-direction: column;">
+            <div class="panel-heading" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: white;">
+              <i data-lucide="message-square-text" style="color: var(--color-brand); width: 20px;"></i>
+              유해 댓글 분석기
+            </div>
+
+            <div class="textarea-box">
+              <textarea class="editor-input" id="commentText" placeholder="이곳에 문장을 작성해 보세요...&#10;(예: 진짜 바보 멍청이 아니야? 행동이 최악이네. 너 같은 인간은 없어져야 한다 씨발)"></textarea>
+              <div class="textarea-footer">
+                <div>자연어 문맥 분석 및 7개 악플 카테고리 판별</div>
+                <div class="counters">
+                  글자 수: <span id="charCount">0</span> | 단어 수: <span id="wordCount">0</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="buttons-row">
+              <button class="btn btn-brand" id="btnAnalyze">
+                <i data-lucide="cpu"></i>분석 시작
+              </button>
+              <button class="btn btn-green" id="btnPurify">
+                <i data-lucide="sparkles"></i>자동 순화
+              </button>
+              <button class="btn btn-outline" id="btnReset" title="초기화">
+                <i data-lucide="rotate-ccw" style="width: 18px;"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Visual Metrics Panel -->
+          <div class="dashboard-panel" id="dashboardPanel">
+            
+            <!-- Horizontal Gauge Bar component -->
+            <div class="gauge-card">
+              <div class="gauge-metrics">
+                <span class="gauge-title-label">악플 위험 지수 (Danger Index)</span>
+                <span class="gauge-percent-val" id="lblGaugePercent">0%</span>
+              </div>
+              <div class="gauge-track">
+                <div class="gauge-fill" id="gaugeFill"></div>
+              </div>
+            </div>
+
+            <!-- Dynamic Alert status card with icon -->
+            <div class="status-alert-box" id="statusAlertBox">
+              <div class="status-alert-icon" id="statusAlertIcon">
+                <i data-lucide="shield-check"></i>
+              </div>
+              <div class="status-alert-content">
+                <span class="status-alert-badge" id="statusAlertBadge">안전 (Safe)</span>
+                <span class="status-alert-text" id="statusAlertText">댓글 검사가 보류 중입니다. 문장을 적고 돌려 보세요.</span>
+              </div>
+            </div>
+
+            <!-- NLP 7 Categories progress lines -->
+            <div class="nlp-categories-section">
+              <div style="font-size: 0.85rem; font-weight: 700; color: white; margin-bottom: 0.35rem;">AI NLP 세부 악성 유형</div>
+              
+              <!-- Category 1: 욕설 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>욕설 (Abuse)</span><span id="valAbuse">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillAbuse"></div></div>
+              </div>
+
+              <!-- Category 2: 인신공격 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>인신공격 (Personal Attack)</span><span id="valPersonal">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillPersonal"></div></div>
+              </div>
+
+              <!-- Category 3: 혐오표현 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>혐오표현 (Hate Speech)</span><span id="valHate">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillHate"></div></div>
+              </div>
+
+              <!-- Category 4: 비하표현 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>비하표현 (Derogatory)</span><span id="valDerogatory">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillDerogatory"></div></div>
+              </div>
+
+              <!-- Category 5: 조롱 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>조롱 (Mockery)</span><span id="valMockery">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillMockery"></div></div>
+              </div>
+
+              <!-- Category 6: 협박 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>협박 (Threat)</span><span id="valThreat">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillThreat"></div></div>
+              </div>
+
+              <!-- Category 7: 성희롱 -->
+              <div class="nlp-cat-bar-item">
+                <div class="nlp-cat-labels"><span>성희롱 (Sexual Harassment)</span><span id="valSex">0%</span></div>
+                <div class="nlp-cat-track"><div class="nlp-cat-fill" id="fillSex"></div></div>
+              </div>
+            </div>
+
+            <!-- Analysis rationales list -->
+            <div class="rationales-card">
+              <span class="rationales-title">AI 판단 근거 및 판정 사유</span>
+              <ul class="rationales-list" id="lblRationales">
+                <li>문서 내용 분석 전입니다.</li>
+              </ul>
+            </div>
+
+          </div>
+
+          <!-- Highlight Preview area -->
+          <div class="preview-section">
+            <div class="preview-heading">
+              <i data-lucide="code" style="color: var(--color-brand); width: 16px;"></i>
+              분석 프리뷰 (금지어 하이라이트)
+            </div>
+            <div class="preview-content" id="previewArea">
+              문장 입력 및 분석을 진행하면 탐지 단어가 [대괄호]와 함께 강조 표시됩니다.
+            </div>
+          </div>
+
+        </div>
       </div>
 
-      <!-- 결과 상태 요약 메시지 -->
-      <div class="result-message" id="lblMessage">분석을 대기 중입니다.</div>
+      <!-- -------------------------------------------------------------
+           TAB 2: HISTORY LOGS
+           ------------------------------------------------------------- -->
+      <div class="tab-page" id="tab-history">
+        <div class="page-title-row">
+          <h2 class="page-title">분석 이력 데이터베이스</h2>
+        </div>
 
-      <!-- 감지된 악플 단어 목록 영역 -->
-      <div class="word-list-card">
-        <div class="word-list-title">탐지 단어 목록</div>
-        <ul class="word-ul" id="detectedList">
-          <li class="empty-state" id="lblEmpty">감지된 유해 단어가 없습니다.</li>
-        </ul>
+        <div class="glass-panel">
+          <div class="history-header-row">
+            <input type="text" class="history-input-search" id="inputHistSearch" placeholder="이력 로그 검색...">
+            <button class="btn btn-outline" id="btnEmptyHistory" style="padding: 0 1rem; width: auto; font-size: 0.8rem; font-weight: 700; gap: 0.3rem;">
+              <i data-lucide="trash-2" style="width: 14px;"></i>
+              전체 지우기
+            </button>
+          </div>
+
+          <div class="history-table-container">
+            <table class="hist-table">
+              <thead>
+                <tr>
+                  <th style="width: 40%;">입력 문장</th>
+                  <th style="width: 10%;">위험도</th>
+                  <th style="width: 10%;">등급</th>
+                  <th style="width: 15%;">주요 악성 유형</th>
+                  <th style="width: 10%;">플랫폼</th>
+                  <th style="width: 11%;">분석 시간</th>
+                  <th style="width: 4%; text-align: center;">작업</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <!-- JS dynamically renders list rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <!-- -------------------------------------------------------------
+           TAB 3: ADMIN STATS DASHBOARD
+           ------------------------------------------------------------- -->
+      <div class="tab-page" id="tab-dashboard">
+        <div class="page-title-row">
+          <h2 class="page-title">종합 대시보드 통계</h2>
+        </div>
+
+        <!-- KPI Summary row -->
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-logo"><i data-lucide="clipboard-list"></i></div>
+            <div class="kpi-texts">
+              <span class="kpi-label-text">총 검사 건수</span>
+              <span class="kpi-number-text" id="statTotalScans">0</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-logo" style="color: var(--color-danger);"><i data-lucide="alert-circle"></i></div>
+            <div class="kpi-texts">
+              <span class="kpi-label-text">평균 위험도</span>
+              <span class="kpi-number-text" id="statAvgRisk">0%</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-logo" style="color: var(--color-warning);"><i data-lucide="trending-up"></i></div>
+            <div class="kpi-texts">
+              <span class="kpi-label-text">최대 악플 유형</span>
+              <span class="kpi-number-text" id="statTopCategory" style="font-size: 0.95rem; font-weight: 800; font-family: var(--font-ko);">없음</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-logo" style="color: var(--color-safe);"><i data-lucide="activity"></i></div>
+            <div class="kpi-texts">
+              <span class="kpi-label-text">안전지수 (Safe Ratio)</span>
+              <span class="kpi-number-text" id="statSafeRatio">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Graphic Charts Row -->
+        <div class="dashboard-charts-layout">
+          
+          <!-- Scans by Platform bar graphs -->
+          <div class="chart-panel-box">
+            <h3 class="chart-panel-title">연동 플랫폼별 탐지 비중</h3>
+            <div class="graph-flex-track" id="platformChartContainer">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Category Percentage breakdown line list -->
+          <div class="chart-panel-box">
+            <h3 class="chart-panel-title">유해 유형별 매칭 빈도</h3>
+            <div class="stats-breakdown-list" id="categoryStatsContainer">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- -------------------------------------------------------------
+           TAB 4: CHROME EXTENSION SIMULATOR
+           ------------------------------------------------------------- -->
+      <div class="tab-page" id="tab-extension">
+        <div class="page-title-row">
+          <h2 class="page-title">크롬 플러그인 시뮬레이터</h2>
+        </div>
+
+        <div class="ext-grid">
+          
+          <!-- Promo guidelines card -->
+          <div class="ext-promo-card">
+            <div class="chrome-version-badge">
+              <i data-lucide="shield-alert" style="width: 14px;"></i>
+              TruthGuard Manifest V3
+            </div>
+            <h3 class="ext-promo-title">웹서핑 중 실시간 악성 필터링 검증</h3>
+            <p class="ext-promo-desc">
+              에브리타임, 유튜브, 인스타그램 댓글 창을 에뮬레이트한 시뮬레이션 환경입니다. 
+              게시하려는 댓글의 유해도 등급에 맞춰 실시간 팝업 안내창 경고 기능 및 강제 업로드 제어 과정을 테스트할 수 있습니다.
+            </p>
+
+            <div style="font-size: 0.85rem; font-weight: 700; color: white;">플랫폼 선택 에뮬레이터</div>
+            <div class="ext-platform-toggles">
+              <button class="ext-platform-btn active" data-platform="youtube">
+                <i data-lucide="youtube" style="width:14px;"></i>YouTube
+              </button>
+              <button class="ext-platform-btn" data-platform="instagram">
+                <i data-lucide="instagram" style="width:14px;"></i>Instagram
+              </button>
+              <button class="ext-platform-btn" data-platform="everytime">
+                <i data-lucide="message-square" style="width:14px;"></i>Everytime
+              </button>
+            </div>
+          </div>
+
+          <!-- Device frame with mock layout screens -->
+          <div class="mock-device-frame">
+            <div class="mock-device-header">
+              <div class="device-dots">
+                <div class="device-dot" style="background:#ff5f56;"></div>
+                <div class="device-dot" style="background:#ffbd2e;"></div>
+                <div class="device-dot" style="background:#27c93f;"></div>
+              </div>
+              <div style="flex-grow:1; background:rgba(0,0,0,0.3); border-radius:4px; padding:0.15rem 0.6rem; text-align:center; font-size:0.65rem;" id="lblDeviceAddress">
+                https://www.youtube.com/watch?v=shield-integrity
+              </div>
+            </div>
+
+            <div class="mock-device-content">
+              
+              <!-- 1. YOUTUBE MOCK SCREEN -->
+              <div class="platform-mock-screen active" id="screen-youtube">
+                <div class="yt-video-placeholder">
+                  <i data-lucide="play-circle" style="color: #ef4444; width:22px;"></i>
+                  <span style="font-weight:700; font-size:0.8rem;">[특강] 사이버 불링 실태와 TruthGuard 예방 교육</span>
+                </div>
+                
+                <div class="sim-comment-editor-box">
+                  <textarea class="sim-textarea" id="txtSimYtComment" placeholder="유튜브 댓글을 입력하세요... (예: 댓글 영상 개쓰레기 꺼져라)"></textarea>
+                  <button class="btn-sim-post" id="btnSimPostYt">댓글 게시</button>
+                </div>
+              </div>
+
+              <!-- 2. INSTAGRAM MOCK SCREEN -->
+              <div class="platform-mock-screen" id="screen-instagram">
+                <div class="ig-header-placeholder">
+                  <div class="ig-avatar"></div>
+                  <span style="font-weight:700; font-size:0.8rem;">truthguard_official</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); height: 100px; border-radius: 6px; border:1px solid rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:0.75rem; color: var(--text-muted);">
+                  [ Instagram Post Photo Mock ]
+                </div>
+                
+                <div class="sim-comment-editor-box">
+                  <textarea class="sim-textarea" id="txtSimIgComment" placeholder="인스타그램 댓글 입력... (예: 사진 완전 미친놈처럼 나왔네)"></textarea>
+                  <button class="btn-sim-post" id="btnSimPostIg">댓글 게시</button>
+                </div>
+              </div>
+
+              <!-- 3. EVERYTIME MOCK SCREEN -->
+              <div class="platform-mock-screen" id="screen-everytime">
+                <div class="et-post-placeholder">
+                  <span class="et-tag">자유게시판</span>
+                  <span style="font-weight:700; font-size:0.8rem;">오늘 교양 수업 진짜 한심하지 않았냐?</span>
+                  <p style="font-size:0.725rem; color:var(--text-muted);">대체 왜 듣는지 모르겠음 멍청이들뿐인듯</p>
+                </div>
+                
+                <div class="sim-comment-editor-box">
+                  <textarea class="sim-textarea" id="txtSimEtComment" placeholder="댓글을 입력하세요... (예: 글쓴이 지랄하네 밤길조심해라 죽여버린다)"></textarea>
+                  <button class="btn-sim-post" id="btnSimPostEt">댓글 게시</button>
+                </div>
+              </div>
+
+              <!-- WARNING CHROME POPUP OVERLAY (INTERACTIVE) -->
+              <div class="tg-extension-popup-modal" id="extPopupModal">
+                <div class="ext-modal-header" id="extModalHeader">
+                  <i data-lucide="alert-triangle" style="width: 16px;"></i>
+                  <span id="extModalTitle">TruthGuard 보호 알림</span>
+                </div>
+                <div class="ext-modal-body" id="extModalBody">
+                  댓글 작성 보류 안내
+                </div>
+                <div class="ext-modal-footer">
+                  <button class="btn-modal-secondary" id="btnModalEdit">수정하기</button>
+                  <button class="btn-modal-primary" id="btnModalPost">그래도 게시</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- -------------------------------------------------------------
+           TAB 5: DATABASE PANEL
+           ------------------------------------------------------------- -->
+      <div class="tab-page" id="tab-database">
+        <div class="page-title-row">
+          <h2 class="page-title">금지 단어 데이터베이스(DB)</h2>
+        </div>
+
+        <div class="db-layout-grid">
+          
+          <!-- Input Form Box -->
+          <div class="db-form-panel">
+            <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: white;">금지 단어 추가</h3>
+            
+            <div class="db-form-row">
+              <label for="inputDbWord">단어 입력</label>
+              <input type="text" id="inputDbWord" class="db-inputs-text" placeholder="예: 무개념">
+            </div>
+
+            <div class="db-form-row">
+              <label for="selectDbSeverity">위험 수위 등급</label>
+              <select id="selectDbSeverity" class="db-inputs-select">
+                <option value="1">1단계 (안전/주의)</option>
+                <option value="2">2단계 (주의/경고)</option>
+                <option value="3" selected>3단계 (위험)</option>
+              </select>
+            </div>
+
+            <div class="db-form-row">
+              <label for="selectDbCategory">악성 유형 분류</label>
+              <select id="selectDbCategory" class="db-inputs-select">
+                <option value="Abuse">욕설</option>
+                <option value="Personal">인신공격</option>
+                <option value="Hate">혐오표현</option>
+                <option value="Derogatory" selected>비하표현</option>
+                <option value="Mockery">조롱</option>
+                <option value="Threat">협박</option>
+                <option value="Sex">성희롱</option>
+              </select>
+            </div>
+
+            <button class="btn-add-db-item" id="btnDbAdd">데이터베이스 등록</button>
+          </div>
+
+          <!-- Table scroller -->
+          <div class="db-table-holder">
+            <div class="db-search-header-row">
+              <i data-lucide="search" style="width: 15px; color: var(--text-muted);"></i>
+              <input type="text" class="db-search-box-input" id="inputDbSearch" placeholder="금지 단어 검색...">
+            </div>
+
+            <div class="db-table-body-scroller">
+              <table class="db-table-repr">
+                <thead>
+                  <tr>
+                    <th>단어</th>
+                    <th>수위</th>
+                    <th>카테고리</th>
+                    <th style="text-align: center;">작업</th>
+                  </tr>
+                </thead>
+                <tbody id="dbListTableBody">
+                  <!-- JS renders list items -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
   </div>
 
   <!-- -------------------------------------------------------------
-       4. JAVASCRIPT LOGIC
+       8. APPLICATION SCRIPT (AI NLP ENGINE SIMULATION & UI PROCESSORS)
        ------------------------------------------------------------- -->
   <script>
-    // [요구사항 1] 악플 단어 사전 정의
-    const BANNED_KEYWORDS = [
-      "멍청이",
-      "바보",
-      "쓰레기",
-      "한심한",
-      "꺼져",
-      "재수없어",
-      "최악",
-      "죽어",
-      "미친놈",
-      "병신"
+    // 1. Initial default keywords dataset loaded for simulated NLP triggers
+    const INITIAL_KEYWORDS = [
+      // Level 1 (안전/주의)
+      { word: '바보', severity: 1, category: 'Derogatory' },
+      { word: '멍청이', severity: 1, category: 'Derogatory' },
+      { word: '한심한', severity: 1, category: 'Mockery' },
+      { word: '꼰대', severity: 1, category: 'Derogatory' },
+      { word: '노잼', severity: 1, category: 'Mockery' },
+      { word: '틀딱', severity: 1, category: 'Hate' },
+
+      // Level 2 (주의/경고)
+      { word: '미친', severity: 2, category: 'Abuse' },
+      { word: '꺼져', severity: 2, category: 'Personal' },
+      { word: '쓰레기', severity: 2, category: 'Personal' },
+      { word: '벌레', severity: 2, category: 'Hate' },
+      { word: '재수없어', severity: 2, category: 'Mockery' },
+      { word: '최악', severity: 2, category: 'Mockery' },
+      { word: '한남', severity: 2, category: 'Hate' },
+      { word: '김치녀', severity: 2, category: 'Hate' },
+      { word: '쓸모없는', severity: 2, category: 'Personal' },
+
+      // Level 3 (위험)
+      { word: '개새끼', severity: 3, category: 'Abuse' },
+      { word: '씨발', severity: 3, category: 'Abuse' },
+      { word: '병신', severity: 3, category: 'Derogatory' },
+      { word: '좆', severity: 3, category: 'Abuse' },
+      { word: '지랄', severity: 3, category: 'Abuse' },
+      { word: '죽어', severity: 3, category: 'Threat' },
+      { word: '죽여버린다', severity: 3, category: 'Threat' },
+      { word: '밤길조심', severity: 3, category: 'Threat' },
+      { word: '창녀', severity: 3, category: 'Sex' },
+      { word: '성희롱', severity: 3, category: 'Sex' }
     ];
 
-    // DOM 요소 캐시
-    const commentText = document.getElementById('commentText');
-    const btnAnalyze = document.getElementById('btnAnalyze');
-    const gaugeFill = document.getElementById('gaugeFill');
-    const lblPercent = document.getElementById('lblPercent');
-    const lblMessage = document.getElementById('lblMessage');
-    const detectedList = document.getElementById('detectedList');
-    const lblEmpty = document.getElementById('lblEmpty');
-    const rootStyle = document.documentElement;
+    // Local DB state
+    let activeBannedWords = [];
+    let scanLogs = [];
 
-    // 현재의 수치를 기억하기 위한 전역 변수
-    let currentScore = 0;
+    // Category mappings for display text
+    const CAT_LABELS = {
+      Abuse: '욕설',
+      Personal: '인신공격',
+      Hate: '혐오표현',
+      Derogatory: '비하표현',
+      Mockery: '조롱',
+      Threat: '협박',
+      Sex: '성희롱'
+    };
 
-    // 1. 단어 검출 및 위험도 연산 기능
-    function runDetection() {
-      const text = commentText.value.trim();
-      
-      // 감지된 고유 단어들을 중복 제거하여 담을 집합(Set) 생성
-      const uniqueFoundWords = new Set();
-      let detectedCount = 0;
-
-      if (text.length > 0) {
-        BANNED_KEYWORDS.forEach(word => {
-          // 대소문자 구분 없이 매칭 여부 판독
-          const lowerText = text.toLowerCase();
-          const lowerWord = word.toLowerCase();
-          
-          if (lowerText.includes(lowerWord)) {
-            // 중복 없이 탐지된 고유 단어 목록에 삽입
-            uniqueFoundWords.add(word);
-            
-            // 본문 내에 해당 단어가 몇 번 쓰였는지 발생 빈도 계산
-            let idx = lowerText.indexOf(lowerWord);
-            while (idx !== -1) {
-              detectedCount++;
-              idx = lowerText.indexOf(lowerWord, idx + 1);
-            }
-          }
-        });
-      }
-
-      // [요구사항 2] 위험도 계산 매핑 로직
-      let targetPercent = 0;
-      let statusText = '';
-      let messageText = '';
-      let colorVariable = '';
-      let glowVariable = '';
-
-      if (detectedCount === 0) {
-        // 0개: 위험도 0%, 상태: 안전
-        targetPercent = 0;
-        statusText = '안전 (Safe)';
-        messageText = '안전한 댓글입니다.';
-        colorVariable = 'var(--color-safe)';
-        glowVariable = 'var(--glow-safe)';
-      } else if (detectedCount >= 1 && detectedCount <= 2) {
-        // 1~2개: 위험도 50%, 상태: 주의
-        targetPercent = 50;
-        statusText = '주의 (Caution)';
-        messageText = '주의가 필요한 표현이 포함되어 있습니다.';
-        colorVariable = 'var(--color-caution)';
-        glowVariable = 'var(--glow-caution)';
+    // 2. Load LocalStorage on Load
+    function initDatabase() {
+      // Load custom database keywords
+      const storedWords = localStorage.getItem('tgPlatformWords');
+      if (storedWords) {
+        activeBannedWords = JSON.parse(storedWords);
       } else {
-        // 3개 이상: 위험도 100%, 상태: 위험
-        targetPercent = 100;
-        statusText = '위험 (Danger)';
-        messageText = '악성 표현이 다수 포함되어 있습니다.';
-        colorVariable = 'var(--color-danger)';
-        glowVariable = 'var(--glow-danger)';
+        activeBannedWords = [...INITIAL_KEYWORDS];
+        localStorage.setItem('tgPlatformWords', JSON.stringify(activeBannedWords));
       }
 
-      // 2. 동적 게이지 업데이트 애니메이션 발동
-      rootStyle.style.setProperty('--gauge-color', colorVariable);
-      rootStyle.style.setProperty('--gauge-glow', glowVariable);
-      gaugeFill.style.width = `${targetPercent}%`; // CSS transition에 의해 1초 동안 width 변경 작동
+      // Load scan history logs
+      const storedLogs = localStorage.getItem('tgPlatformLogs');
+      if (storedLogs) {
+        scanLogs = JSON.parse(storedLogs);
+      } else {
+        // Pre-seed some mock records for statistics chart rendering
+        scanLogs = [
+          { sentence: "이 강의 진짜 한심하고 최악이네 ㅋㅋㅋ", score: 45, tier: "주의", topCat: "조롱", platform: "YouTube", time: "2026-06-10 12:15" },
+          { sentence: "게시글 완전 쓰레기 급이네 꺼져라", score: 68, tier: "경고", topCat: "인신공격", platform: "Everytime", time: "2026-06-10 16:30" },
+          { sentence: "사진 얼굴 미친놈 같네 성희롱 창녀냐", score: 95, tier: "위험", topCat: "성희롱", platform: "Instagram", time: "2026-06-10 21:05" },
+          { sentence: "오늘 교양과제 개꿀잼 화이팅!", score: 0, tier: "안전", topCat: "없음", platform: "Everytime", time: "2026-06-11 02:10" }
+        ];
+        localStorage.setItem('tgPlatformLogs', JSON.stringify(scanLogs));
+      }
 
-      // 3. 퍼센트 숫자 실시간 카운터 애니메이션 실행
-      animatePercentage(targetPercent);
-
-      // 4. 요약 결과 및 결과 텍스트 바인딩
-      lblMessage.textContent = messageText;
-
-      // 5. 탐지된 중복 제거 단어 렌더링
-      renderWordsList(Array.from(uniqueFoundWords));
+      renderDatabaseTable();
+      renderHistoryTable();
+      updateDashboardStats();
     }
 
-    // [요구사항 3] 퍼센트 숫자 카운터 애니메이션 구현 (requestAnimationFrame 활용)
-    function animatePercentage(target) {
+    // Cache Core DOM Elements
+    const commentText = document.getElementById('commentText');
+    const charCount = document.getElementById('charCount');
+    const wordCount = document.getElementById('wordCount');
+    const btnAnalyze = document.getElementById('btnAnalyze');
+    const btnPurify = document.getElementById('btnPurify');
+    const btnReset = document.getElementById('btnReset');
+
+    const dashboardPanel = document.getElementById('dashboardPanel');
+    const lblGaugePercent = document.getElementById('lblGaugePercent');
+    const gaugeFill = document.getElementById('gaugeFill');
+    const statusAlertBox = document.getElementById('statusAlertBox');
+    const statusAlertIcon = document.getElementById('statusAlertIcon');
+    const statusAlertBadge = document.getElementById('statusAlertBadge');
+    const statusAlertText = document.getElementById('statusAlertText');
+    const previewArea = document.getElementById('previewArea');
+    const lblRationales = document.getElementById('lblRationales');
+    const bgAuraBlob = document.getElementById('bgAuraBlob');
+
+    // 7 Category Bar Elements
+    const fills = {
+      Abuse: document.getElementById('fillAbuse'),
+      Personal: document.getElementById('fillPersonal'),
+      Hate: document.getElementById('fillHate'),
+      Derogatory: document.getElementById('fillDerogatory'),
+      Mockery: document.getElementById('fillMockery'),
+      Threat: document.getElementById('fillThreat'),
+      Sex: document.getElementById('fillSex')
+    };
+
+    const labels = {
+      Abuse: document.getElementById('valAbuse'),
+      Personal: document.getElementById('valPersonal'),
+      Hate: document.getElementById('valHate'),
+      Derogatory: document.getElementById('valDerogatory'),
+      Mockery: document.getElementById('valMockery'),
+      Threat: document.getElementById('valThreat'),
+      Sex: document.getElementById('valSex')
+    };
+
+    // Sidebar Toggles
+    const menuItems = document.querySelectorAll('.menu-item');
+    const tabPages = document.querySelectorAll('.tab-page');
+
+    menuItems.forEach(item => {
+      item.addEventListener('click', () => {
+        menuItems.forEach(mi => mi.classList.remove('active'));
+        tabPages.forEach(tp => tp.classList.remove('active'));
+        
+        item.classList.add('active');
+        const targetTab = document.getElementById(item.getAttribute('data-tab'));
+        targetTab.classList.add('active');
+
+        // Draw admin graphics if dashboard selected
+        if (item.getAttribute('data-tab') === 'tab-dashboard') {
+          setTimeout(updateDashboardStats, 80);
+        }
+      });
+    });
+
+    // Editor counters
+    commentText.addEventListener('input', () => {
+      const text = commentText.value;
+      charCount.textContent = text.length;
+      wordCount.textContent = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    });
+
+    // 3. CORE NLP CLASSIFICATION & EVALUATION ENGINE
+    let currentScore = 0;
+
+    function runNLPAnalysis(targetText = null, targetPlatform = 'Web Playground') {
+      const text = targetText !== null ? targetText : commentText.value.trim();
+      
+      if (!text) {
+        if (targetText === null) resetAnalyzer();
+        return 0;
+      }
+
+      // Initialize category counters
+      let scores = { Abuse: 0, Personal: 0, Hate: 0, Derogatory: 0, Mockery: 0, Threat: 0, Sex: 0 };
+      const matchedTokens = [];
+
+      // Sort banned words by length descending
+      const sortedBanned = [...activeBannedWords].sort((a,b) => b.word.length - a.word.length);
+
+      sortedBanned.forEach(item => {
+        const lowerText = text.toLowerCase();
+        const lowerWord = item.word.toLowerCase();
+        
+        if (lowerText.includes(lowerWord)) {
+          let occurrences = 0;
+          let idx = lowerText.indexOf(lowerWord);
+          while (idx !== -1) {
+            occurrences++;
+            idx = lowerText.indexOf(lowerWord, idx + 1);
+          }
+
+          if (occurrences > 0) {
+            matchedTokens.push({
+              word: item.word,
+              severity: item.severity,
+              category: item.category,
+              count: occurrences
+            });
+
+            // Calculate weight based on severity
+            let weight = item.severity * 28 * occurrences;
+            scores[item.category] += weight;
+          }
+        }
+      });
+
+      // Direct NLP context evaluation triggers
+      // E.g., Threat context booster
+      if (text.includes('죽여') || text.includes('밤길')) {
+        scores.Threat += 20;
+      }
+      if (text.includes('창녀') || text.includes('몸뚱이')) {
+        scores.Sex += 20;
+      }
+      if (text.includes('!')) {
+        scores.Mockery += 5; // Exclamation increases tone aggressiveness
+      }
+
+      // Clamp category progress bar values (0 to 100)
+      let maxVal = 0;
+      let topCategory = 'none';
+
+      Object.keys(scores).forEach(key => {
+        scores[key] = Math.min(scores[key], 100);
+        if (scores[key] > maxVal) {
+          maxVal = scores[key];
+          topCategory = key;
+        }
+      });
+
+      // Calculate final overall weighted score
+      let finalScore = 0;
+      if (matchedTokens.length > 0) {
+        const highestSeverity = Math.max(...matchedTokens.map(m => m.severity));
+        if (highestSeverity === 1) finalScore = Math.min(25 + matchedTokens.length * 6, 50);
+        else if (highestSeverity === 2) finalScore = Math.min(50 + matchedTokens.length * 10, 79);
+        else if (highestSeverity === 3) finalScore = Math.min(80 + matchedTokens.length * 10, 100);
+      } else {
+        // Base conversational risk logic
+        finalScore = Math.min(scores.Mockery + scores.Derogatory, 20);
+      }
+
+      // Determine Tiers
+      let tier = '안전';
+      let message = '안전한 댓글입니다.';
+      let tierColor = 'var(--color-safe)';
+      let tierGlow = 'var(--glow-safe)';
+      let statusIconName = 'shield-check';
+
+      if (finalScore >= 31 && finalScore <= 60) {
+        tier = '주의';
+        message = '부정적인 표현이 포함되어 있습니다.';
+        tierColor = 'var(--color-caution)';
+        tierGlow = 'var(--glow-caution)';
+        statusIconName = 'lightbulb';
+      } else if (finalScore >= 61 && finalScore <= 80) {
+        tier = '경고';
+        message = '상대방에게 상처를 줄 수 있는 표현입니다.';
+        tierColor = 'var(--color-warning)';
+        tierGlow = 'var(--glow-warning)';
+        statusIconName = 'alert-triangle';
+      } else if (finalScore >= 81) {
+        tier = '위험';
+        message = '악성 댓글로 판단됩니다. 다시 작성하시겠습니까?';
+        tierColor = 'var(--color-danger)';
+        tierGlow = 'var(--glow-danger)';
+        statusIconName = 'alert-octagon';
+      }
+
+      // If this is a general playground scan, animate UI dashboard
+      if (targetText === null) {
+        updateAnalyzerDashboard(finalScore, tier, message, tierColor, tierGlow, statusIconName, scores, matchedTokens, text);
+      }
+
+      // Add to log list
+      const topCatText = topCategory !== 'none' && scores[topCategory] > 0 ? CAT_LABELS[topCategory] : '없음';
+      
+      const logItem = {
+        sentence: text,
+        score: finalScore,
+        tier: tier,
+        topCat: topCatText,
+        platform: targetPlatform,
+        time: getFormattedTime()
+      };
+
+      scanLogs.unshift(logItem);
+      localStorage.setItem('tgPlatformLogs', JSON.stringify(scanLogs));
+      renderHistoryTable();
+      updateDashboardStats();
+
+      return finalScore;
+    }
+
+    // 4. ANIMATED UI DEVELOPER CODE (Gauges, Counters)
+    function updateAnalyzerDashboard(score, tier, message, color, glow, icon, categoryScores, matchedTokens, originalText) {
+      // 1. Set variables for glow shifts
+      rootStyle.setProperty('--risk-color', color);
+      rootStyle.setProperty('--risk-glow', glow);
+      
+      // 2. Animate gauge progress width
+      gaugeFill.style.width = `${score}%`;
+
+      // 3. Animate percentage counter in JS
+      animateNumCounter(score);
+
+      // 4. Update dynamic Alert status card
+      dashboardPanel.className = 'dashboard-panel glow-active';
+      statusAlertBadge.textContent = `${tier} (${score >= 81 ? 'Danger' : score >= 61 ? 'Warning' : score >= 31 ? 'Caution' : 'Safe'})`;
+      statusAlertText.textContent = message;
+      statusAlertIcon.innerHTML = `<i data-lucide="${icon}"></i>`;
+      lucide.createIcons();
+
+      // 5. Update 7 category progress bars
+      Object.keys(fills).forEach(key => {
+        fills[key].style.width = `${categoryScores[key]}%`;
+        fills[key].style.backgroundColor = color;
+        labels[key].textContent = `${categoryScores[key]}%`;
+      });
+
+      // 6. Generate detailed rationale explanations
+      lblRationales.innerHTML = '';
+      let hasReason = false;
+
+      if (categoryScores.Abuse > 20) {
+        appendRationale('거칠고 모욕적인 비속어 및 욕설 어휘가 식별되었습니다.');
+        hasReason = true;
+      }
+      if (categoryScores.Personal > 20) {
+        appendRationale('특정 상대방의 인격이나 역량을 깎아내리려는 인신공격성 언어가 발견되었습니다.');
+        hasReason = true;
+      }
+      if (categoryScores.Hate > 20) {
+        appendRationale('사회적 집단, 젠더, 나이 등에 대한 차별적 낙인 효과를 지닌 혐오적 표현이 식별되었습니다.');
+        hasReason = true;
+      }
+      if (categoryScores.Derogatory > 20) {
+        appendRationale('상대를 비방하여 불쾌감을 형성할 수 있는 비하 발언 패턴이 감지되었습니다.');
+        hasReason = true;
+      }
+      if (categoryScores.Mockery > 20) {
+        appendRationale('비아냥 어조 또는 빈정거리는 비난 맥락이 포함되어 있습니다.');
+        hasReason = true;
+      }
+      if (categoryScores.Threat > 20) {
+        appendRationale('신체 위해, 공포심 조장 등을 노리는 노골적인 협박성 표현이 포착되었습니다.');
+        hasReason = true;
+      }
+      if (categoryScores.Sex > 20) {
+        appendRationale('성적 불쾌감이나 수치심을 유발할 여지가 다분한 단어가 검출되었습니다.');
+        hasReason = true;
+      }
+
+      if (!hasReason) {
+        appendRationale('문장에서 악성 댓글로 볼 수 있는 언어 규범 침해 요소가 발견되지 않았습니다.');
+      }
+
+      // 7. Bracket highlights [단어]
+      renderBracketHighlightText(originalText, matchedTokens);
+    }
+
+    // requestAnimationFrame counter loop
+    function animateNumCounter(target) {
       const start = currentScore;
       const end = target;
-      
       if (start === end) {
-        lblPercent.textContent = `${end}%`;
+        lblGaugePercent.textContent = `${end}%`;
         return;
       }
-      
-      const duration = 1000; // 1000ms (1초) 설정
+
+      const duration = 1000; // 1s to match CSS transition
       let startTime = null;
-      
+
       function step(timestamp) {
         if (!startTime) startTime = timestamp;
         const progress = Math.min((timestamp - startTime) / duration, 1);
-        
-        // 부드럽게 증가하는 숫자 계산
-        const val = Math.floor(progress * (end - start) + start);
-        lblPercent.textContent = `${val}%`;
-        
+        const value = Math.floor(progress * (end - start) + start);
+        lblGaugePercent.textContent = `${value}%`;
+
         if (progress < 1) {
           window.requestAnimationFrame(step);
         } else {
-          currentScore = end; // 종료 시 최신 수치 동기화
-          lblPercent.textContent = `${end}%`;
+          currentScore = end;
+          lblGaugePercent.textContent = `${end}%`;
         }
       }
-      
+
       window.requestAnimationFrame(step);
     }
 
-    // [요구사항 4] 중복이 제거된 탐지 단어 리스트 렌더링
-    function renderWordsList(wordsArray) {
-      // 기존 목록 비우기
-      detectedList.innerHTML = '';
-      
-      if (wordsArray.length === 0) {
-        detectedList.appendChild(lblEmpty);
+    function appendRationale(text) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      lblRationales.appendChild(li);
+    }
+
+    // Highlights bracket markers
+    function renderBracketHighlightText(text, matchedTokens) {
+      if (matchedTokens.length === 0) {
+        previewArea.textContent = text;
         return;
       }
 
-      // 단어마다 별도의 <li> 태그 생성하여 표시
-      wordsArray.forEach(word => {
-        const li = document.createElement('li');
-        li.className = 'word-li';
-        li.textContent = word;
-        detectedList.appendChild(li);
+      let html = escapeHtml(text);
+      const sorted = [...matchedTokens].sort((a,b) => b.word.length - a.word.length);
+
+      sorted.forEach(item => {
+        const esc = escapeHtml(item.word);
+        const regex = new RegExp(esc, 'gi');
+        html = html.replace(regex, (match) => {
+          return `[<mark class="lv${item.severity}">${match}</mark>]`;
+        });
       });
+
+      previewArea.innerHTML = html;
     }
 
-    // 버튼 클릭 이벤트에 바인딩
-    btnAnalyze.addEventListener('click', runDetection);
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
 
-    // textarea 내 키보드 입력 편의 기능 (Ctrl + Enter로 바로 검사 가능)
-    commentText.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.key === 'Enter') {
-        e.preventDefault();
-        runDetection();
+    function getFormattedTime() {
+      const now = new Date();
+      const yr = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, '0');
+      const dy = String(now.getDate()).padStart(2, '0');
+      const hr = String(now.getHours()).padStart(2, '0');
+      const mn = String(now.getMinutes()).padStart(2, '0');
+      return `${yr}-${mo}-${dy} ${hr}:${mn}`;
+    }
+
+    // Reset analyzer back to baseline
+    function resetAnalyzer() {
+      commentText.value = '';
+      charCount.textContent = 0;
+      wordCount.textContent = 0;
+
+      gaugeFill.style.width = '0%';
+      lblGaugePercent.textContent = '0%';
+      dashboardPanel.className = 'dashboard-panel';
+
+      rootStyle.setProperty('--risk-color', 'var(--color-safe)');
+      rootStyle.setProperty('--risk-glow', 'var(--glow-safe)');
+
+      statusAlertBadge.textContent = '안전 (Safe)';
+      statusAlertText.textContent = '댓글 검사가 보류 중입니다. 문장을 적고 돌려 보세요.';
+      statusAlertIcon.innerHTML = `<i data-lucide="shield-check"></i>`;
+      lucide.createIcons();
+
+      Object.keys(fills).forEach(key => {
+        fills[key].style.width = '0%';
+        labels[key].textContent = '0%';
+      });
+
+      lblRationales.innerHTML = '<li>문서 내용 분석 전입니다.</li>';
+      previewArea.textContent = '문장 입력 및 분석을 진행하면 탐지 단어가 [대괄호]와 함께 강조 표시됩니다.';
+      currentScore = 0;
+    }
+
+    // Auto-censor implementation
+    function purifyInputText() {
+      let text = commentText.value;
+      if (!text.trim()) return;
+
+      const sorted = [...activeBannedWords].sort((a,b) => b.word.length - a.word.length);
+      let replaced = false;
+
+      sorted.forEach(item => {
+        const regex = new RegExp(item.word, 'gi');
+        if (regex.test(text)) {
+          const mask = '💚'.repeat(item.word.length);
+          text = text.replace(regex, mask);
+          replaced = true;
+        }
+      });
+
+      if (replaced) {
+        commentText.value = text;
+        const event = new Event('input');
+        commentText.dispatchEvent(event);
+        runNLPAnalysis();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 5. TAB 2: ANALYSIS HISTORY DATABASE LOGS
+    // -------------------------------------------------------------
+    function renderHistoryTable(searchQ = '') {
+      const tbody = document.getElementById('historyTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = scanLogs.filter(log => 
+        log.sentence.toLowerCase().includes(searchQ.toLowerCase()) ||
+        log.topCat.includes(searchQ) ||
+        log.platform.toLowerCase().includes(searchQ.toLowerCase())
+      );
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:2rem;">이력 데이터베이스에 검색된 로그 기록이 없습니다.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach((log, index) => {
+        const tr = document.createElement('tr');
+        
+        let tierClass = 'safe';
+        if (log.tier === '주의') tierClass = 'caution';
+        else if (log.tier === '경고') tierClass = 'warning';
+        else if (log.tier === '위험') tierClass = 'danger';
+
+        tr.innerHTML = `
+          <td style="font-weight: 500; color: white; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(log.sentence)}</td>
+          <td style="font-weight: 800; font-family: var(--font-en);">${log.score}%</td>
+          <td><span class="hist-badge ${tierClass}">${log.tier}</span></td>
+          <td style="font-weight: 600;">${log.topCat}</td>
+          <td style="font-weight: 700; color: #a5b4fc;">${log.platform}</td>
+          <td style="color: var(--text-muted); font-size: 0.8rem; font-family: var(--font-en);">${log.time}</td>
+          <td style="text-align: center;">
+            <button class="btn-hist-del" data-index="${index}"><i data-lucide="trash-2" style="width: 14px;"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind row actions
+      tbody.querySelectorAll('.btn-hist-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          scanLogs.splice(idx, 1);
+          localStorage.setItem('tgPlatformLogs', JSON.stringify(scanLogs));
+          renderHistoryTable(document.getElementById('inputHistSearch').value);
+          updateDashboardStats();
+        });
+      });
+
+      lucide.createIcons();
+    }
+
+    // Bulk Delete
+    document.getElementById('btnEmptyHistory').addEventListener('click', () => {
+      if (confirm('모든 유해성 탐지 이력 기록을 일괄 삭제하시겠습니까?')) {
+        scanLogs = [];
+        localStorage.setItem('tgPlatformLogs', JSON.stringify(scanLogs));
+        renderHistoryTable();
+        updateDashboardStats();
       }
     });
 
-    // 기본 로드 시 연산 수행 초기화
-    runDetection();
+    document.getElementById('inputHistSearch').addEventListener('input', (e) => {
+      renderHistoryTable(e.target.value);
+    });
+
+    // -------------------------------------------------------------
+    // 6. TAB 3: ADMIN STATISTICS DASHBOARD CHARTS
+    // -------------------------------------------------------------
+    function updateDashboardStats() {
+      const total = scanLogs.length;
+      document.getElementById('statTotalScans').textContent = total;
+
+      // Avg Score
+      let avgRisk = 0;
+      if (total > 0) {
+        const sum = scanLogs.reduce((acc, log) => acc + log.score, 0);
+        avgRisk = Math.round(sum / total);
+      }
+      document.getElementById('statAvgRisk').textContent = `${avgRisk}%`;
+
+      // Top Category
+      const catCounts = {};
+      let topCat = '없음';
+      let maxCount = 0;
+
+      scanLogs.forEach(log => {
+        if (log.topCat !== '없음') {
+          catCounts[log.topCat] = (catCounts[log.topCat] || 0) + 1;
+          if (catCounts[log.topCat] > maxCount) {
+            maxCount = catCounts[log.topCat];
+            topCat = log.topCat;
+          }
+        }
+      });
+      document.getElementById('statTopCategory').textContent = topCat;
+
+      // Safe Ratio
+      const safeCount = scanLogs.filter(l => l.score <= 30).length;
+      const safeRatio = total > 0 ? Math.round((safeCount / total) * 100) : 100;
+      document.getElementById('statSafeRatio').textContent = `${safeRatio}%`;
+
+      // DRAW PLATFORM BAR GRAPHICS (Everytime, YouTube, Instagram, etc)
+      const platformCounts = { YouTube: 0, Instagram: 0, Everytime: 0, 'Web Playground': 0 };
+      scanLogs.forEach(l => {
+        if (platformCounts[l.platform] !== undefined) {
+          platformCounts[l.platform]++;
+        } else {
+          platformCounts[l.platform] = 1;
+        }
+      });
+
+      const platChart = document.getElementById('platformChartContainer');
+      platChart.innerHTML = '';
+
+      Object.keys(platformCounts).forEach(plat => {
+        const count = platformCounts[plat];
+        const heightVal = total > 0 ? Math.min((count / total) * 150, 150) : 0;
+
+        const col = document.createElement('div');
+        col.className = 'graph-pillar-col';
+        col.innerHTML = `
+          <div class="graph-pillar-bar" data-val="${count}건" style="height: ${heightVal}px;"></div>
+          <span class="graph-pillar-label" style="font-size:0.65rem; text-align:center;">${plat}</span>
+        `;
+        platChart.appendChild(col);
+      });
+
+      // DRAW CATEGORY FREQUENCY PROGRESS RATES
+      const catChart = document.getElementById('categoryStatsContainer');
+      catChart.innerHTML = '';
+
+      const catsList = ['욕설', '인신공격', '혐오표현', '비하표현', '조롱', '협박', '성희롱'];
+      const totalMatches = Object.values(catCounts).reduce((a,b) => a+b, 0) || 1;
+
+      catsList.forEach(c => {
+        const count = catCounts[c] || 0;
+        const pct = Math.round((count / totalMatches) * 100);
+
+        const item = document.createElement('div');
+        item.className = 'stats-breakdown-item';
+        item.innerHTML = `
+          <div class="stats-breakdown-header">
+            <span>${c}</span>
+            <span>${count}건 (${pct}%)</span>
+          </div>
+          <div class="stats-breakdown-track">
+            <div class="stats-breakdown-fill" style="width: ${pct}%; background-color: ${pct > 40 ? 'var(--color-danger)' : 'var(--color-brand)'}"></div>
+          </div>
+        `;
+        catChart.appendChild(item);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 7. TAB 4: CHROME EXTENSION MOCK PLATFORMS & INTERCEPTOR
+    // -------------------------------------------------------------
+    const extPlatformBtns = document.querySelectorAll('.ext-platform-btn');
+    const mockScreens = document.querySelectorAll('.platform-mock-screen');
+    const lblDeviceAddress = document.getElementById('lblDeviceAddress');
+    
+    // Ext warning overlay modal elements
+    const extPopupModal = document.getElementById('extPopupModal');
+    const extModalHeader = document.getElementById('extModalHeader');
+    const extModalTitle = document.getElementById('extModalTitle');
+    const extModalBody = document.getElementById('extModalBody');
+    const btnModalEdit = document.getElementById('btnModalEdit');
+    const btnModalPost = document.getElementById('btnModalPost');
+
+    // State parameters
+    let currentExtPlatform = 'youtube';
+    let interceptedText = '';
+    let currentInputTarget = null;
+
+    // Platform screen toggles
+    extPlatformBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        extPlatformBtns.forEach(b => b.classList.remove('active'));
+        mockScreens.forEach(s => s.classList.remove('active'));
+
+        btn.classList.add('active');
+        const plat = btn.getAttribute('data-platform');
+        currentExtPlatform = plat;
+        
+        document.getElementById(`screen-${plat}`).classList.add('active');
+
+        // Address bar mock URL update
+        if (plat === 'youtube') lblDeviceAddress.textContent = 'https://www.youtube.com/watch?v=shield-integrity';
+        else if (plat === 'instagram') lblDeviceAddress.textContent = 'https://www.instagram.com/p/truthguard-demo/';
+        else if (plat === 'everytime') lblDeviceAddress.textContent = 'https://everytime.kr/374829';
+      });
+    });
+
+    // Intercept Submit Action
+    function handleExtPostSubmit(textareaId, platformLabel) {
+      const textarea = document.getElementById(textareaId);
+      const text = textarea.value.trim();
+      
+      if (!text) {
+        alert('작성할 댓글 내용을 적어주세요.');
+        return;
+      }
+
+      // Check if text triggers warning (score >= 60 in simulator detection logic)
+      let matches = [];
+      activeBannedWords.forEach(item => {
+        if (text.toLowerCase().includes(item.word.toLowerCase())) {
+          matches.push(item.word);
+        }
+      });
+
+      // Show warning popup if vulgar slang matches
+      if (matches.length > 0) {
+        interceptedText = text;
+        currentInputTarget = textarea;
+        
+        // Dynamic Warning Tiers based on matched words
+        let warningText = '부정적인 표현이 포함되어 있습니다.';
+        let borderAndHeaderColor = 'var(--color-caution)';
+        
+        if (matches.length >= 3) {
+          warningText = '악성 댓글로 판단됩니다. 다시 작성하시겠습니까?';
+          borderAndHeaderColor = 'var(--color-danger)';
+        } else if (matches.length >= 1) {
+          warningText = '상대방에게 상처를 줄 수 있는 표현입니다.';
+          borderAndHeaderColor = 'var(--color-warning)';
+        }
+
+        // Apply dynamic modal styling
+        extPopupModal.style.setProperty('--risk-color', borderAndHeaderColor);
+        extModalBody.innerHTML = `
+          <strong>[ TruthGuard 탐지 결과 ]</strong><br>
+          ${warningText}<br><br>
+          감지된 표현: <strong>${escapeHtml(matches.join(', '))}</strong>
+        `;
+
+        extPopupModal.style.display = 'flex';
+        setTimeout(() => extPopupModal.classList.add('show'), 50);
+      } else {
+        // Safe comment posting
+        runNLPAnalysis(text, platformLabel);
+        alert(`🎉 [${platformLabel}] 댓글이 안전하게 등록되었습니다!`);
+        textarea.value = '';
+      }
+    }
+
+    // Bind mock buttons
+    document.getElementById('btnSimPostYt').addEventListener('click', () => handleExtPostSubmit('txtSimYtComment', 'YouTube'));
+    document.getElementById('btnSimPostIg').addEventListener('click', () => handleExtPostSubmit('txtSimIgComment', 'Instagram'));
+    document.getElementById('btnSimPostEt').addEventListener('click', () => handleExtPostSubmit('txtSimEtComment', 'Everytime'));
+
+    // Modal warnings controls
+    btnModalEdit.addEventListener('click', () => {
+      extPopupModal.classList.remove('show');
+      setTimeout(() => extPopupModal.style.display = 'none', 300);
+      if (currentInputTarget) currentInputTarget.focus();
+    });
+
+    btnModalPost.addEventListener('click', () => {
+      extPopupModal.classList.remove('show');
+      setTimeout(() => extPopupModal.style.display = 'none', 300);
+      
+      // Force post log entry
+      let platformName = 'YouTube';
+      if (currentExtPlatform === 'instagram') platformName = 'Instagram';
+      else if (currentExtPlatform === 'everytime') platformName = 'Everytime';
+
+      runNLPAnalysis(interceptedText, platformName);
+      alert('⚠️ 보호 경고를 무시하고 댓글 게시를 완료하였습니다.');
+      if (currentInputTarget) currentInputTarget.value = '';
+    });
+
+    // -------------------------------------------------------------
+    // 8. TAB 5: DATABASE MANAGE BOARD
+    // -------------------------------------------------------------
+    const inputDbSearch = document.getElementById('inputDbSearch');
+    const dbListTableBody = document.getElementById('dbListTableBody');
+    const inputDbWord = document.getElementById('inputDbWord');
+    const selectDbSeverity = document.getElementById('selectDbSeverity');
+    const selectDbCategory = document.getElementById('selectDbCategory');
+    const btnDbAdd = document.getElementById('btnDbAdd');
+
+    function renderDatabaseTable(searchQ = '') {
+      dbListTableBody.innerHTML = '';
+
+      const filtered = activeBannedWords.filter(item => 
+        item.word.toLowerCase().includes(searchQ.toLowerCase()) ||
+        CAT_LABELS[item.category].includes(searchQ)
+      );
+
+      // Sort by severity desc, alphabetical name
+      filtered.sort((a,b) => b.severity - a.severity || a.word.localeCompare(b.word));
+
+      filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        
+        let labelColor = 'var(--color-safe)';
+        if (item.severity === 2) labelColor = 'var(--color-warning)';
+        else if (item.severity === 3) labelColor = 'var(--color-danger)';
+
+        tr.innerHTML = `
+          <td style="font-weight: 700; color: white;">${escapeHtml(item.word)}</td>
+          <td><span style="color: ${labelColor}; font-weight: bold;">● Level ${item.severity}</span></td>
+          <td style="font-weight: 600;">${CAT_LABELS[item.category]}</td>
+          <td style="text-align: center;">
+            <button class="btn-db-row-del" data-word="${escapeHtml(item.word)}"><i data-lucide="trash-2" style="width: 14px;"></i></button>
+          </td>
+        `;
+        dbListTableBody.appendChild(tr);
+      });
+
+      // Bind deletes
+      dbListTableBody.querySelectorAll('.btn-db-row-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const w = btn.getAttribute('data-word');
+          activeBannedWords = activeBannedWords.filter(item => item.word.toLowerCase() !== w.toLowerCase());
+          localStorage.setItem('tgPlatformWords', JSON.stringify(activeBannedWords));
+          renderDatabaseTable(inputDbSearch.value);
+        });
+      });
+
+      lucide.createIcons();
+    }
+
+    // Add Word
+    btnDbAdd.addEventListener('click', () => {
+      const word = inputDbWord.value.trim();
+      const severity = parseInt(selectDbSeverity.value, 10);
+      const category = selectDbCategory.value;
+
+      if (!word) {
+        alert('단어명을 입력해 주세요.');
+        return;
+      }
+
+      // Check duplicates
+      const exists = activeBannedWords.some(item => item.word.toLowerCase() === word.toLowerCase());
+      if (exists) {
+        alert('이미 데이터베이스에 존재하는 금지 단어입니다.');
+        return;
+      }
+
+      activeBannedWords.push({ word, severity, category });
+      localStorage.setItem('tgPlatformWords', JSON.stringify(activeBannedWords));
+      renderDatabaseTable(inputDbSearch.value);
+      
+      inputDbWord.value = '';
+      alert(`🎉 [${word}] 단어가 유해어 DB에 성공적으로 등록되었습니다.`);
+    });
+
+    inputDbSearch.addEventListener('input', (e) => {
+      renderDatabaseTable(e.target.value);
+    });
+
+    // -------------------------------------------------------------
+    // 9. INITIATE APP TRIGGERS
+    // -------------------------------------------------------------
+    btnAnalyze.addEventListener('click', () => runNLPAnalysis());
+    btnPurify.addEventListener('click', purifyInputText);
+    btnReset.addEventListener('click', resetAnalyzer);
+
+    // Ctrl + Enter shortcut inside textarea
+    commentText.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        runNLPAnalysis();
+      }
+    });
+
+    // Startup load
+    initDatabase();
+    lucide.createIcons();
+
   </script>
 </body>
 </html>
