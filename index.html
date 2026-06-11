@@ -411,7 +411,16 @@
       background-color: var(--risk-color);
       border-radius: 10px;
       box-shadow: 0 0 10px var(--risk-glow);
-      transition: width 1s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.5s ease, box-shadow 0.5s ease;
+      transition: width 1s ease, background-color 0.5s ease, box-shadow 0.5s ease;
+    }
+
+    /* 로딩 상태 스피너 회전 애니메이션 */
+    .animate-spin {
+      animation: spin 1.2s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
     /* Warning Status Card badge */
@@ -1829,6 +1838,12 @@
     const lblRationales = document.getElementById('lblRationales');
     const bgAuraBlob = document.getElementById('bgAuraBlob');
 
+    // [필수 수정 사항 7] DOM 요소 연결 변수 정의
+    const analyzeButton = btnAnalyze;
+    const gaugeBar = gaugeFill;
+    const percentageText = lblGaugePercent;
+    const riskLabel = statusAlertBadge;
+
     // 7 Category Bar Elements
     const fills = {
       Abuse: document.getElementById('fillAbuse'),
@@ -2011,32 +2026,33 @@
     }
 
     // 4. ANIMATED UI DEVELOPER CODE (Gauges, Counters)
+    // [필수 수정 사항 11] 분석 완료 후 게이지 길이, 색상, 퍼센트, 등급 등 실시간 업데이트 처리
     function updateAnalyzerDashboard(score, tier, message, color, glow, icon, categoryScores, matchedTokens, originalText) {
-      // 1. Set variables for glow shifts
+      // 1. 게이지 색상 실시간 변경 처리 (안전, 주의, 경고, 위험 색상 동적 매핑)
       rootStyle.setProperty('--risk-color', color);
       rootStyle.setProperty('--risk-glow', glow);
       
-      // 2. Animate gauge progress width
-      gaugeFill.style.width = `${score}%`;
+      // 2. [필수 수정 사항 3, 4] 게이지 바의 가로 폭(width) 변경 및 애니메이션 작동
+      gaugeBar.style.width = `${score}%`;
 
-      // 3. Animate percentage counter in JS
+      // 3. [필수 수정 사항 5, 6] 퍼센트 숫자 실시간 카운터 애니메이션 실행 (이전 값과 관계없이 항상 새 값으로)
       animateNumCounter(score);
 
-      // 4. Update dynamic Alert status card
+      // 4. 위험 등급 및 메시지 갱신
       dashboardPanel.className = 'dashboard-panel glow-active';
-      statusAlertBadge.textContent = `${tier} (${score >= 81 ? 'Danger' : score >= 61 ? 'Warning' : score >= 31 ? 'Caution' : 'Safe'})`;
+      riskLabel.textContent = `${tier} (${score >= 81 ? 'Danger' : score >= 61 ? 'Warning' : score >= 31 ? 'Caution' : 'Safe'})`;
       statusAlertText.textContent = message;
       statusAlertIcon.innerHTML = `<i data-lucide="${icon}"></i>`;
       lucide.createIcons();
 
-      // 5. Update 7 category progress bars
+      // 5. 7개 악플 유형 비중 업데이트
       Object.keys(fills).forEach(key => {
         fills[key].style.width = `${categoryScores[key]}%`;
         fills[key].style.backgroundColor = color;
         labels[key].textContent = `${categoryScores[key]}%`;
       });
 
-      // 6. Generate detailed rationale explanations
+      // 6. 분석 판단 사유(근거) 업데이트
       lblRationales.innerHTML = '';
       let hasReason = false;
 
@@ -2073,33 +2089,33 @@
         appendRationale('문장에서 악성 댓글로 볼 수 있는 언어 규범 침해 요소가 발견되지 않았습니다.');
       }
 
-      // 7. Bracket highlights [단어]
+      // 7. 문장 하이라이트 표시
       renderBracketHighlightText(originalText, matchedTokens);
     }
 
-    // requestAnimationFrame counter loop
+    // [필수 수정 사항 5, 6] requestAnimationFrame 기반 퍼센트 숫자 실시간 카운터 애니메이션 구현
     function animateNumCounter(target) {
       const start = currentScore;
       const end = target;
       if (start === end) {
-        lblGaugePercent.textContent = `${end}%`;
+        percentageText.textContent = `${end}%`;
         return;
       }
 
-      const duration = 1000; // 1s to match CSS transition
+      const duration = 1000; // 1초간 실행 (CSS transition width 1s 와 동기화)
       let startTime = null;
 
       function step(timestamp) {
         if (!startTime) startTime = timestamp;
         const progress = Math.min((timestamp - startTime) / duration, 1);
         const value = Math.floor(progress * (end - start) + start);
-        lblGaugePercent.textContent = `${value}%`;
+        percentageText.textContent = `${value}%`;
 
         if (progress < 1) {
           window.requestAnimationFrame(step);
         } else {
-          currentScore = end;
-          lblGaugePercent.textContent = `${end}%`;
+          currentScore = end; // 다음 애니메이션의 시작점 동기화를 위해 업데이트
+          percentageText.textContent = `${end}%`;
         }
       }
 
@@ -2561,15 +2577,16 @@
     // -------------------------------------------------------------
     // 9. INITIATE APP TRIGGERS
     // -------------------------------------------------------------
-    btnAnalyze.addEventListener('click', () => runNLPAnalysis());
+    // [필수 수정 사항 1] 분석 시작 버튼 클릭 시 분석 로더 실행
+    analyzeButton.addEventListener('click', startAnalysisWithLoader);
     btnPurify.addEventListener('click', purifyInputText);
     btnReset.addEventListener('click', resetAnalyzer);
 
-    // Ctrl + Enter shortcut inside textarea
+    // Ctrl + Enter 단축키 기능에도 로더 분석 연동
     commentText.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
-        runNLPAnalysis();
+        startAnalysisWithLoader();
       }
     });
 
